@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using System.Net.Mail;
 
 namespace FCG.Contracts;
 
@@ -13,8 +13,9 @@ public static class IdentitySnapshotValidation
             throw new ArgumentException("Unknown identity role or lifecycle state.", nameof(snapshot));
         if (string.IsNullOrWhiteSpace(snapshot.Name) || snapshot.Name != snapshot.Name.Trim())
             throw new ArgumentException("A normalized name is required.", nameof(snapshot));
-        if (string.IsNullOrWhiteSpace(snapshot.Email) || snapshot.Email != snapshot.Email.Trim().ToLowerInvariant()
-            || !Regex.IsMatch(snapshot.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))
+        if (string.IsNullOrWhiteSpace(snapshot.Email) || snapshot.Email.Length > 256
+            || snapshot.Email != snapshot.Email.Trim().ToLowerInvariant()
+            || !MailAddress.TryCreate(snapshot.Email, out var parsedEmail) || parsedEmail.Address != snapshot.Email)
             throw new ArgumentException("A normalized email is required.", nameof(snapshot));
         if (!IsUtcMicroseconds(snapshot.OccurredAtUtc) || !IsUtcMicroseconds(snapshot.CreatedAtUtc)
             || snapshot.CreatedAtUtc > snapshot.OccurredAtUtc)
