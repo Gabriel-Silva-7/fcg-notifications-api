@@ -87,11 +87,48 @@ namespace FCG.Notifications.Migrations
                     b.ToTable("MessageConflicts");
                 });
 
+            modelBuilder.Entity("FCG.Notifications.Persistence.NotificationAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ClaimedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("IntentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("LeaseVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IntentId", "LeaseVersion")
+                        .IsUnique();
+
+                    b.ToTable("NotificationAttempts");
+                });
+
             modelBuilder.Entity("FCG.Notifications.Persistence.NotificationIntent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("BusinessId")
                         .HasColumnType("uuid");
@@ -110,6 +147,22 @@ namespace FCG.Notifications.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<string>("LastFailureCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("LeaseVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("PreparedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -123,6 +176,9 @@ namespace FCG.Notifications.Migrations
 
                     b.Property<string>("RecipientName")
                         .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("State")
                         .IsRequired()
@@ -221,6 +277,15 @@ namespace FCG.Notifications.Migrations
                         {
                             t.HasCheckConstraint("CK_UserContacts_Version", "\"EventVersion\" > 0");
                         });
+                });
+
+            modelBuilder.Entity("FCG.Notifications.Persistence.NotificationAttempt", b =>
+                {
+                    b.HasOne("FCG.Notifications.Persistence.NotificationIntent", null)
+                        .WithMany()
+                        .HasForeignKey("IntentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

@@ -16,6 +16,13 @@ public sealed class NotificationIntent
     public string? RecipientEmail { get; set; }
     public long? ContactEventVersion { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
+    public Guid? LeaseToken { get; set; }
+    public long LeaseVersion { get; set; }
+    public DateTimeOffset? LeaseExpiresAtUtc { get; set; }
+    public int Attempts { get; set; }
+    public DateTimeOffset? NextAttemptAtUtc { get; set; }
+    public DateTimeOffset? SentAtUtc { get; set; }
+    public string? LastFailureCode { get; set; }
     public DateTimeOffset? PreparedAtUtc { get; set; }
 
     public void Prepare(UserContact contact, DateTimeOffset now)

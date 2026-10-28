@@ -1,4 +1,5 @@
 using FCG.Notifications;
+using FCG.Notifications.Delivery;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using FCG.Notifications.Messaging;
@@ -24,6 +25,12 @@ builder.Services.AddDbContext<NotificationsDbContext>(options =>
 });
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddNotificationsMessaging(builder.Configuration);
+var dispatcherOptions = builder.Configuration.GetSection("Dispatcher").Get<DispatcherOptions>() ?? new();
+dispatcherOptions.Validate();
+builder.Services.AddSingleton(dispatcherOptions);
+builder.Services.AddSingleton<INotificationSink, ConsoleNotificationSink>();
+builder.Services.AddScoped<NotificationDispatcher>();
+builder.Services.AddHostedService<NotificationWorker>();
 if (!builder.Environment.IsDevelopment()) builder.Logging.AddFilter("MassTransit", LogLevel.None);
 builder.Services.AddHealthChecks().AddCheck<NotificationStorageHealthCheck>("notifications-storage", tags: ["ready"]);
 var app = builder.Build();

@@ -5,6 +5,7 @@ namespace FCG.Notifications.Persistence;
 
 public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> options) : DbContext(options)
 {
+    public DbSet<NotificationAttempt> NotificationAttempts => Set<NotificationAttempt>();
     public DbSet<PaymentObservation> PaymentObservations => Set<PaymentObservation>();
     public DbSet<UserContact> UserContacts => Set<UserContact>();
     public DbSet<MessageConflict> MessageConflicts => Set<MessageConflict>();
@@ -31,6 +32,13 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
             entity.Property(x => x.Payload).IsRequired();
             entity.Property(x => x.PayloadHash).HasMaxLength(64).IsRequired();
         });
+        model.Entity<NotificationAttempt>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.IntentId, x.LeaseVersion }).IsUnique();
+            entity.Property(x => x.Result).HasMaxLength(30).IsRequired();
+            entity.HasOne<NotificationIntent>().WithMany().HasForeignKey(x => x.IntentId).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<PaymentObservation>(entity =>
         {
             entity.HasKey(x => x.OrderId);
@@ -51,6 +59,7 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
             entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(40);
             entity.Property(x => x.State).HasConversion<string>().HasMaxLength(30);
             entity.Property(x => x.Price).HasPrecision(18, 2);
+            entity.Property(x => x.LastFailureCode).HasMaxLength(80);
             entity.Property(x => x.RecipientEmail).HasMaxLength(256);
         });
     }

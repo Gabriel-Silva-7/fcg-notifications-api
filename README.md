@@ -2,8 +2,8 @@
 
 Serviço .NET 10 de projeção de identidade e intenções duráveis de notificações
 simuladas no console. Mantém banco próprio: não consulta o banco de Users.
-Este incremento recebe eventos de identidade e persiste intenções de boas-vindas;
-a emissão no console pertence ao dispatcher do próximo incremento.
+Consome identidade e resultados de pagamento, mantém intenções próprias e emite
+boas-vindas/confirmação simuladas no console por um dispatcher recuperável.
 
 ## Executar
 
@@ -20,6 +20,9 @@ externo de segredos:
 | `RabbitMq__Username` / `RabbitMq__Password` | Credencial própria, obrigatória, sem valor padrão |
 | `Queues__Payments` | Fila própria de resultados; padrão `fcg-notifications-payments`, distinta da fila de identidade |
 | `Queues__Identity` | Fila própria durável; padrão `fcg-notifications-identity` |
+| `Dispatcher__PollSeconds` | Pulso do worker, padrão1, intervalo1–60s |
+| `Dispatcher__LeaseSeconds` | Posse recuperável, padrão30, intervalo1–3600s |
+| `Dispatcher__BackoffSeconds` | Espera após falha de emissão, padrão5, intervalo1–3600s |
 | `Database__MigrateOnStartup` | `true` aplica migrations antes de atender; padrão `false` |
 
 Use role PostgreSQL própria, sem superuser/criação de bancos/roles. Para migrar,
@@ -70,7 +73,7 @@ Cadastro atrasado usa o contato mais recente já projetado, inclusive de usuári
 excluído; snapshot isolado nunca cria boas-vindas. Ao preparar a intenção como
 `Ready`, nome, e-mail e versão do contato ficam congelados. Mudanças posteriores
 não redirecionam a intenção já preparada. Falha antes do commit desfaz projeção e
-intenção juntas, permitindo reentrega. Ainda não há dispatcher nem emissão no console.
+intenção juntas, permitindo reentrega. O dispatcher emite a intenção e só então confirma o progresso.
 
 ## Resultados e confirmação de compra
 
@@ -86,8 +89,8 @@ observação, com UserId/GameId/Price originais. Rejected não cria confirmaçã
 Contato conhecido, inclusive Deleted, prepara Ready e congela destinatário/versão.
 Sem contato, fica PendingContact sem destinatário inventado. Eventos de identidade
 preparam pendências existentes com o contato efetivo daquela transação.
-`PendingContactReconciler` também recupera pendências sem novo evento; o loop
-hospedado que o aciona e emite o console pertence ao incremento do dispatcher.
+`PendingContactReconciler` também recupera pendências sem novo evento; o worker
+hospedado o aciona em cada pulso antes de despachar até25 intenções.
 Sua seleção ignora contatos ainda ausentes para evitar que bloqueiem outros pedidos.
 
 Novos diagnósticos preservam o tipo concreto da mensagem e o payload original.
@@ -95,6 +98,36 @@ O campo vazio em diagnósticos anteriores à migration significa procedência
 indeterminada; não se infere cadastro de snapshot. Replay operacional ainda não
 está exposto. Migrations acrescentam observações/metadata e ampliam a chave do
 conflito com o tipo, preservando registros existentes.
+
+## Dispatcher e recuperação
+
+O worker inicia automaticamente. `Ready` recebe uma posse transacional `Sending`
+com token, versão e expiração; `NotificationAttempts` registra a tentativa antes
+da emissão. A disputa usa lock por IntentId e revalida o estado depois de adquiri-lo.
+Duas réplicas compartilham apenas o banco Notifications; uma posse válida é
+registrada por vez. Relógios UTC das réplicas devem estar sincronizados.
+
+A saída contém `[E-MAIL SIMULADO]`, tipo, IntentId, AttemptId, UserId e, para compra,
+OrderId/GameId/Price. O destinatário preserva somente a primeira letra local
+(quando houver mais de uma) e o domínio, como `p***@example.com`; entrada inválida
+é totalmente mascarada. Nome e endereço completo não são registrados.
+É uma simulação no console, sem servidor de e-mail ou envio externo. Mantenha
+a categoria `FCG.Notifications.Delivery.ConsoleNotificationSink` em Information
+e o provedor console habilitado. Se o logger estiver desabilitado, a tentativa
+falha e mantém backoff em vez de registrar Sent sem emissão.
+
+Somente depois do logger retornar o worker marca `Sent`, exigindo token/versão
+atuais e posse ainda válida. Falha de emissão conserva a intenção com backoff e
+razão fixa, sem texto da exceção. Interrupção/cancelamento ou falha no banco deixa
+`Sending` recuperável após expiração. A tentativa abandonada fica no histórico.
+Dono obsoleto não confirma nem altera posse nova. `Sent` não é despachada novamente.
+
+Console e PostgreSQL não formam uma transação. Crash depois do log e antes de Sent,
+ou atraso além da posse durante a emissão, pode repetir a saída: o mesmo IntentId
+permite correlacionar, e cada tentativa tem AttemptId distinto. A garantia é de
+intenção única e retomada com emissão pelo menos uma vez quando as dependências
+voltam; não se promete exatamente uma linha. Pendências sem contato continuam
+pendentes, sem marcar envio fictício. Não remover linhas/ledger para forçar replay.
 
 ## Saúde e logs
 
@@ -130,5 +163,8 @@ A conexão configurada precisa alcançar PostgreSQL/RabbitMQ pelo container.
 Os testes usam bancos/roles e filas isolados, PostgreSQL/RabbitMQ reais, verificam
 ordem, duplicatas, conflito durável, concorrência, restart e payload inválido em
 `_error`, intenções únicas, contato congelado e rollback atômico, além dos
-contratos/probes herdados. Este incremento não comprova envio de
-boas-vindas/confirmação no console, compra distribuída, Compose completo ou Kubernetes.
+contratos/probes herdados. Este incremento não comprova compra distribuída, Compose completo ou Kubernetes.
+
+Os testes anteriores removem somente o worker hospedado para inspecionar contratos
+dos incrementos de persistência. Os cenários do dispatcher ativam o worker real ou
+controlam relógio e pulsos com PostgreSQL real, ledger e captura do logger real.

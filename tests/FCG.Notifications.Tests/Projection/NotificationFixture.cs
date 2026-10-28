@@ -51,6 +51,7 @@ public sealed class NotificationFactory(string connectionString, IReadOnlyDictio
     public CaptureLogs Logs { get; } = new();
     public string IdentityQueue { get; } = "not-identity-" + Guid.NewGuid().ToString("N");
     public string PaymentsQueue { get; } = "not-payments-" + Guid.NewGuid().ToString("N");
+    public bool RunDispatcher { get; set; }
     public Dictionary<string, string?> Overrides { get; } = new();
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -63,6 +64,12 @@ public sealed class NotificationFactory(string connectionString, IReadOnlyDictio
         {
             services.AddLogging(logging => logging.AddProvider(Logs));
             services.Configure<MassTransitHostOptions>(options => options.WaitUntilStarted = true);
+            if (!RunDispatcher)
+            {
+                var worker = services.Single(x => x.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+                    && x.ImplementationType == typeof(FCG.Notifications.Delivery.NotificationWorker));
+                services.Remove(worker);
+            }
             customize?.Invoke(services);
         });
     }
