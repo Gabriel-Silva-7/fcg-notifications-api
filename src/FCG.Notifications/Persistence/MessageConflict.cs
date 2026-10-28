@@ -3,6 +3,7 @@ namespace FCG.Notifications.Persistence;
 public sealed class MessageConflict
 {
     public Guid Id { get; set; }
+    public string MessageType { get; set; } = "";
     public string Kind { get; set; } = "";
     public Guid BusinessId { get; set; }
     public Guid EventId { get; set; }

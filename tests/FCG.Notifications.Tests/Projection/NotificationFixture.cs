@@ -50,12 +50,13 @@ public sealed class NotificationFactory(string connectionString, IReadOnlyDictio
     public string ConnectionString { get; } = connectionString;
     public CaptureLogs Logs { get; } = new();
     public string IdentityQueue { get; } = "not-identity-" + Guid.NewGuid().ToString("N");
+    public string PaymentsQueue { get; } = "not-payments-" + Guid.NewGuid().ToString("N");
     public Dictionary<string, string?> Overrides { get; } = new();
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Production");
         var settings = new Dictionary<string, string?>(brokerSettings)
-        { ["ConnectionStrings:Default"] = ConnectionString, ["Database:MigrateOnStartup"] = "true", ["Queues:Identity"] = IdentityQueue };
+        { ["ConnectionStrings:Default"] = ConnectionString, ["Database:MigrateOnStartup"] = "true", ["Queues:Identity"] = IdentityQueue, ["Queues:Payments"] = PaymentsQueue };
         foreach (var pair in Overrides) settings[pair.Key] = pair.Value;
         foreach (var pair in settings) builder.UseSetting(pair.Key, pair.Value);
         builder.ConfigureTestServices(services =>

@@ -5,6 +5,7 @@ namespace FCG.Notifications.Persistence;
 
 public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> options) : DbContext(options)
 {
+    public DbSet<PaymentObservation> PaymentObservations => Set<PaymentObservation>();
     public DbSet<UserContact> UserContacts => Set<UserContact>();
     public DbSet<MessageConflict> MessageConflicts => Set<MessageConflict>();
     public DbSet<NotificationIntent> NotificationIntents => Set<NotificationIntent>();
@@ -23,11 +24,19 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
         model.Entity<MessageConflict>(entity =>
         {
             entity.HasKey(x => x.Id);
-            entity.HasIndex(x => new { x.Kind, x.BusinessId, x.EventId, x.PayloadHash }).IsUnique();
+            entity.HasIndex(x => new { x.Kind, x.BusinessId, x.EventId, x.MessageType, x.PayloadHash }).IsUnique();
             entity.Property(x => x.Kind).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.MessageType).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Reason).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Payload).IsRequired();
             entity.Property(x => x.PayloadHash).HasMaxLength(64).IsRequired();
+        });
+        model.Entity<PaymentObservation>(entity =>
+        {
+            entity.HasKey(x => x.OrderId);
+            entity.Property(x => x.Price).HasPrecision(18, 2);
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(80);
         });
         model.Entity<NotificationIntent>(entity =>
         {
@@ -41,6 +50,7 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
             entity.HasIndex(x => new { x.State, x.CreatedAtUtc });
             entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(40);
             entity.Property(x => x.State).HasConversion<string>().HasMaxLength(30);
+            entity.Property(x => x.Price).HasPrecision(18, 2);
             entity.Property(x => x.RecipientEmail).HasMaxLength(256);
         });
     }

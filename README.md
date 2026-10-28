@@ -1,6 +1,6 @@
 # FCG Notifications
 
-Serviço .NET 10 de projeção de identidade e, nos próximos incrementos, notificações
+Serviço .NET 10 de projeção de identidade e intenções duráveis de notificações
 simuladas no console. Mantém banco próprio: não consulta o banco de Users.
 Este incremento recebe eventos de identidade e persiste intenções de boas-vindas;
 a emissão no console pertence ao dispatcher do próximo incremento.
@@ -18,6 +18,7 @@ externo de segredos:
 | `RabbitMq__Port` | AMQP, padrão 5672 |
 | `RabbitMq__VirtualHost` | `/fcg`, obrigatório |
 | `RabbitMq__Username` / `RabbitMq__Password` | Credencial própria, obrigatória, sem valor padrão |
+| `Queues__Payments` | Fila própria de resultados; padrão `fcg-notifications-payments`, distinta da fila de identidade |
 | `Queues__Identity` | Fila própria durável; padrão `fcg-notifications-identity` |
 | `Database__MigrateOnStartup` | `true` aplica migrations antes de atender; padrão `false` |
 
@@ -71,6 +72,30 @@ excluído; snapshot isolado nunca cria boas-vindas. Ao preparar a intenção com
 não redirecionam a intenção já preparada. Falha antes do commit desfaz projeção e
 intenção juntas, permitindo reentrega. Ainda não há dispatcher nem emissão no console.
 
+## Resultados e confirmação de compra
+
+A fila própria de pagamentos recebe `PaymentProcessedEvent` canônico. A primeira
+observação válida de cada OrderId fica em `PaymentObservations`, inclusive Rejected.
+O lock transacional por pedido protege a comparação e a gravação; reentrega
+equivalente com outro MessageId não gera nova intenção. Divergência em usuário,
+jogo, preço, status, razão ou instante preserva a primeira observação e registra
+`MessageConflicts` antes de confirmar o consumo. Não se recalcula pagamento aqui.
+
+Approved persiste uma `PurchaseConfirmation` única por OrderId, atomicamente com a
+observação, com UserId/GameId/Price originais. Rejected não cria confirmação.
+Contato conhecido, inclusive Deleted, prepara Ready e congela destinatário/versão.
+Sem contato, fica PendingContact sem destinatário inventado. Eventos de identidade
+preparam pendências existentes com o contato efetivo daquela transação.
+`PendingContactReconciler` também recupera pendências sem novo evento; o loop
+hospedado que o aciona e emite o console pertence ao incremento do dispatcher.
+Sua seleção ignora contatos ainda ausentes para evitar que bloqueiem outros pedidos.
+
+Novos diagnósticos preservam o tipo concreto da mensagem e o payload original.
+O campo vazio em diagnósticos anteriores à migration significa procedência
+indeterminada; não se infere cadastro de snapshot. Replay operacional ainda não
+está exposto. Migrations acrescentam observações/metadata e ampliam a chave do
+conflito com o tipo, preservando registros existentes.
+
 ## Saúde e logs
 
 - `/health/live`: anônimo, 200 `Healthy`, independente das dependências.
@@ -106,4 +131,4 @@ Os testes usam bancos/roles e filas isolados, PostgreSQL/RabbitMQ reais, verific
 ordem, duplicatas, conflito durável, concorrência, restart e payload inválido em
 `_error`, intenções únicas, contato congelado e rollback atômico, além dos
 contratos/probes herdados. Este incremento não comprova envio de
-boas-vindas, confirmação, compra distribuída, Compose completo ou Kubernetes.
+boas-vindas/confirmação no console, compra distribuída, Compose completo ou Kubernetes.

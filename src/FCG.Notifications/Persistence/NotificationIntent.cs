@@ -9,6 +9,8 @@ public sealed class NotificationIntent
     public NotificationKind Kind { get; set; }
     public Guid BusinessId { get; set; }
     public Guid UserId { get; set; }
+    public Guid? GameId { get; set; }
+    public decimal? Price { get; set; }
     public NotificationState State { get; set; }
     public string? RecipientName { get; set; }
     public string? RecipientEmail { get; set; }

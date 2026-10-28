@@ -12,11 +12,18 @@ public static class NotificationsMessaging
         var queue = configuration["Queues:Identity"] ?? "fcg-notifications-identity";
         if (string.IsNullOrWhiteSpace(queue) || queue.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_' or '.')))
             throw new InvalidOperationException("Queues:Identity requires a valid durable endpoint name.");
+        var paymentQueue = configuration["Queues:Payments"] ?? "fcg-notifications-payments";
+        if (string.IsNullOrWhiteSpace(paymentQueue) || paymentQueue == queue
+            || paymentQueue.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_' or '.')))
+            throw new InvalidOperationException("Queues:Payments requires its own valid durable endpoint name.");
         services.AddSingleton(settings);
+        services.AddScoped<PaymentNotificationHandler>();
+        services.AddScoped<PendingContactReconciler>();
         services.AddScoped<IdentityProjectionHandler>();
         services.AddMassTransit(bus =>
         {
             bus.ConfigureHealthCheckOptions(options => { options.Tags.Clear(); options.Tags.Add("diagnostic"); });
+            bus.AddConsumer<PaymentNotificationConsumer>();
             bus.AddConsumer<IdentityConsumer<UserCreatedEvent>>();
             bus.AddConsumer<IdentityConsumer<UserStateChangedEvent>>();
             bus.AddConsumer<IdentityConsumer<UserStateSnapshotEvent>>();
@@ -26,10 +33,20 @@ public static class NotificationsMessaging
                 { host.Username(settings.Username); host.Password(settings.Password); host.PublisherConfirmation = true; });
                 rabbit.ConfigureJsonSerializerOptions(options =>
                 {
+                    options.Converters.Insert(0, new PaymentProcessedEventConverter());
                     options.Converters.Insert(0, new IdentityEventConverter<UserCreatedEvent>());
                     options.Converters.Insert(0, new IdentityEventConverter<UserStateChangedEvent>());
                     options.Converters.Insert(0, new IdentityEventConverter<UserStateSnapshotEvent>());
                     return options;
+                });
+                rabbit.ReceiveEndpoint(paymentQueue, endpoint =>
+                {
+                    endpoint.UseMessageRetry(retry =>
+                    {
+                        retry.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15));
+                        retry.Ignore<ArgumentException>();
+                    });
+                    endpoint.ConfigureConsumer<PaymentNotificationConsumer>(context);
                 });
                 rabbit.ReceiveEndpoint(queue, endpoint =>
                 {

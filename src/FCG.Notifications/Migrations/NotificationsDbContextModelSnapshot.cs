@@ -48,6 +48,11 @@ namespace FCG.Notifications.Migrations
                     b.Property<DateTimeOffset>("LastSeenAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("MessageType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
                     b.Property<int>("Observations")
                         .HasColumnType("integer");
 
@@ -76,7 +81,7 @@ namespace FCG.Notifications.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Kind", "BusinessId", "EventId", "PayloadHash")
+                    b.HasIndex("Kind", "BusinessId", "EventId", "MessageType", "PayloadHash")
                         .IsUnique();
 
                     b.ToTable("MessageConflicts");
@@ -97,6 +102,9 @@ namespace FCG.Notifications.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("GameId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -104,6 +112,10 @@ namespace FCG.Notifications.Migrations
 
                     b.Property<DateTimeOffset?>("PreparedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("RecipientEmail")
                         .HasMaxLength(256)
@@ -131,6 +143,39 @@ namespace FCG.Notifications.Migrations
                         {
                             t.HasCheckConstraint("CK_NotificationIntents_ReadyContact", "\"State\" = 'PendingContact' OR (\"RecipientName\" IS NOT NULL AND \"RecipientEmail\" IS NOT NULL AND \"ContactEventVersion\" IS NOT NULL AND \"ContactEventVersion\" > 0)");
                         });
+                });
+
+            modelBuilder.Entity("FCG.Notifications.Persistence.PaymentObservation", b =>
+                {
+                    b.Property<Guid>("OrderId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GameId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTimeOffset>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("OrderId");
+
+                    b.ToTable("PaymentObservations");
                 });
 
             modelBuilder.Entity("FCG.Notifications.Persistence.UserContact", b =>

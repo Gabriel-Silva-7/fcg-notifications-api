@@ -26,12 +26,12 @@ public sealed class IdentityProjectionHandler(NotificationsDbContext db, TimePro
             var payload = IdentityContractJson.Write(incoming);
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
             var conflict = await db.MessageConflicts.SingleOrDefaultAsync(x => x.Kind == "Identity"
-                && x.BusinessId == incoming.UserId && x.EventId == incoming.EventId && x.PayloadHash == hash, cancellationToken);
+                && x.BusinessId == incoming.UserId && x.EventId == incoming.EventId && x.MessageType == incoming.GetType().Name && x.PayloadHash == hash, cancellationToken);
             if (conflict is null)
             {
                 conflict = new MessageConflict
                 {
-                    Id = Guid.NewGuid(), Kind = "Identity", BusinessId = incoming.UserId, EventId = incoming.EventId,
+                    Id = Guid.NewGuid(), Kind = "Identity", MessageType = incoming.GetType().Name, BusinessId = incoming.UserId, EventId = incoming.EventId,
                     TransportMessageId = transportId, EventVersion = incoming.EventVersion,
                     Reason = incoming.EventVersion == contact!.EventVersion
                         ? "DivergentIdentityVersion" : "DeletedIdentityCannotBeRestored",
@@ -50,6 +50,14 @@ public sealed class IdentityProjectionHandler(NotificationsDbContext db, TimePro
         {
             db.NotificationIntents.Add(NotificationIntent.Welcome(contact
                 ?? throw new InvalidOperationException("Registration contact is unavailable."), clock.GetUtcNow()));
+        }
+        // Prepare only pending intents; a Ready recipient is immutable.
+        if (decision != ProjectionDecision.Conflict)
+        {
+            var pending = await db.NotificationIntents.Where(x => x.UserId == incoming.UserId
+                && x.State == NotificationState.PendingContact).OrderBy(x => x.Id).Select(x => x.Id).ToArrayAsync(cancellationToken);
+            foreach (var id in pending)
+                await PendingContactReconciler.PrepareAsync(db, id, clock.GetUtcNow(), cancellationToken, contact);
         }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
