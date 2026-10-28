@@ -3,15 +3,17 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using FCG.Notifications.Tests.Projection;
 
-public sealed class HealthTests
+[Collection("notifications")]
+public sealed class HealthTests(NotificationFixture fixture)
 {
     [Theory]
     [InlineData("/health/live")]
     [InlineData("/health/ready")]
     public async Task Initial_host_reports_healthy(string path)
     {
-        await using var factory = new WebApplicationFactory<Program>();
+        await using var factory = await fixture.CreateAsync();
         using var client = factory.CreateClient();
         using var response = await client.GetAsync(path);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -22,9 +24,8 @@ public sealed class HealthTests
     [InlineData(HealthStatus.Degraded)]
     public async Task Ready_failure_returns_503_without_affecting_live(HealthStatus status)
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.AddHealthChecks()
-                .AddCheck("dependency", () => new HealthCheckResult(status), tags: ["ready"])));
+        await using var factory = await fixture.CreateAsync(services => services.AddHealthChecks()
+                .AddCheck("dependency", () => new HealthCheckResult(status), tags: ["ready"]));
         using var client = factory.CreateClient();
         using var ready = await client.GetAsync("/health/ready");
         using var live = await client.GetAsync("/health/live");
@@ -36,9 +37,8 @@ public sealed class HealthTests
     [Fact]
     public async Task Readiness_ignores_checks_without_ready_tag()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.AddHealthChecks()
-                .AddCheck("unrelated", () => HealthCheckResult.Unhealthy("test only"))));
+        await using var factory = await fixture.CreateAsync(services => services.AddHealthChecks()
+                .AddCheck("unrelated", () => HealthCheckResult.Unhealthy("test only")));
         using var client = factory.CreateClient();
         using var response = await client.GetAsync("/health/ready");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

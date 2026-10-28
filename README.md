@@ -1,46 +1,95 @@
 # FCG Notifications
 
-Host inicial em ASP.NET Core, sem endpoints de negócio. Há um projeto web de produção e um projeto de testes do host.
+Serviço .NET 10 de projeção de identidade e, nos próximos incrementos, notificações
+simuladas no console. Mantém banco próprio: não consulta o banco de Users.
+Este incremento recebe eventos de identidade; ainda não emite e-mails simulados.
 
-## Requisitos e execução local
+## Executar
 
-Instale o SDK .NET **10.0.400**. O `global.json` desativa roll-forward; confirme que `dotnet --version` apresenta essa versão na raiz do repositório. Use `dotnet` no PATH, ou substitua o executável nos comandos pela instalação desejada.
+Requer SDK **10.0.400** (global.json sem roll-forward), PostgreSQL 16, RabbitMQ e
+Docker acessível para os testes Testcontainers. Configure por ambiente ou provedor
+externo de segredos:
+
+| Variável | Comportamento |
+|---|---|
+| `ConnectionStrings__Default` | Banco exclusivo Notifications, obrigatório |
+| `RabbitMq__Host` | Host/IP do broker, obrigatório, sem URL com credenciais |
+| `RabbitMq__Port` | AMQP, padrão 5672 |
+| `RabbitMq__VirtualHost` | `/fcg`, obrigatório |
+| `RabbitMq__Username` / `RabbitMq__Password` | Credencial própria, obrigatória, sem valor padrão |
+| `Queues__Identity` | Fila própria durável; padrão `fcg-notifications-identity` |
+| `Database__MigrateOnStartup` | `true` aplica migrations antes de atender; padrão `false` |
+
+Use role PostgreSQL própria, sem superuser/criação de bancos/roles. Para migrar,
+a role precisa criar os objetos no seu banco. O usuário AMQP opera somente no
+vhost configurado, sem tag administrativa; não compartilhar uma fila de consumo
+com Catalog. A topologia de implantação deve existir antes das publicações de Users.
 
 ```sh
 dotnet restore FCG.Notifications.sln --locked-mode
 dotnet build FCG.Notifications.sln -c Release --no-restore
 dotnet test FCG.Notifications.sln -c Release --no-restore
-dotnet run --project src/FCG.Notifications -c Release --no-build --urls http://127.0.0.1:8080
+dotnet run --project src/FCG.Notifications -c Release --no-build --no-launch-profile --urls http://127.0.0.1:8080
 ```
 
-Pacotes têm versões exatas em `Directory.Packages.props`; os lockfiles preservam as dependências transitivas. Nullable, implicit usings e warnings-as-errors estão habilitados para net10.0.
+## Identidade e conflitos
 
-## Saúde e configuração
+MassTransit 8.5.11 consome `UserCreatedEvent`, `UserStateChangedEvent` e
+`UserStateSnapshotEvent`, namespace `FCG.Contracts`, na fila de identidade própria.
+Payloads seguem o contrato canônico: contato normalizado, enums nomeados, GUIDs e
+versão válidos, UTC de seis casas decimais. Não recebem senha, hash ou JWT.
 
-- `GET /health/live`: 200, texto `Healthy`. Indica que o processo responde, sem executar checks de dependências.
-- `GET /health/ready`: 200, texto `Healthy` neste bootstrap. Executa somente health checks com tag `ready`; resultados Degraded ou Unhealthy retornam 503.
+A aplicação serializa por UserId com lock transacional PostgreSQL e aplica a
+política de projeção na mesma transação da gravação. Versão maior atualiza o
+snapshot completo; menor ou equivalente mantém a projeção. Excluído não volta a
+ativo/bloqueado. Divergência da mesma versão e restauração incompatível preservam
+o estado anterior e gravam `MessageConflicts` para diagnóstico, com IDs, payload,
+razão, datas e contagem. O consumo só termina com sucesso depois desse commit.
+Não se corrige payload nem se apaga estado automaticamente para forçar replay.
 
-Ainda não há banco, broker, consumidores nem autenticação conectados. Readiness comprova apenas o bootstrap nesta etapa; os incrementos de infraestrutura acrescentarão checks reais.
+`UserContacts` preserva contato inclusive depois da exclusão lógica, conforme a
+política de notificações pendentes. Proteja o banco, backups, fila principal e
+fila de erro: eles contêm contato. Nomes não recebem um limite adicional ao do
+contrato de eventos. Não há FK nem leitura de dados de outro serviço.
 
-No container, `ASPNETCORE_HTTP_PORTS=8080` define a porta e o processo usa o usuário `app` (UID 1654). O argumento `--healthcheck` executa somente um probe HTTP .NET contra `http://127.0.0.1:8080/health/ready`, com timeout de três segundos: código 0 para resposta de sucesso e 1 para erro, timeout ou HTTP sem sucesso. O health check acompanha a mesma porta; preserve 8080 no container.
+Erros transitórios recebem até três novas tentativas (1s, 5s, 15s), depois seguem
+para a fila durável `_error`; payload inválido não aplica estado. Interrupção antes
+do commit deixa a mensagem recuperável, e reentregas não revertem a projeção.
+Snapshot de recuperação é estado, sem inventar fato de cadastro ou boas-vindas.
+O processamento de cadastro atrasado será ligado à intenção Welcome separadamente.
 
-## Container local
+## Saúde e logs
 
-O build multi-stage usa SDK 10.0.400 e runtime 10.0.11, com digests fixados. O contexto Docker inclui somente a configuração de build e `src`, excluindo bin/obj e arquivos de ambiente.
+- `/health/live`: anônimo, 200 `Healthy`, independente das dependências.
+- `/health/ready`: schema, estado do bus e conectividade/autenticação AMQP;
+  saudável 200, dependência indisponível/degraded/unhealthy 503.
+- `dotnet FCG.Notifications.dll --healthcheck`: probe HTTP local na porta 8080,
+  timeout de três segundos, retorno 0/1, sem abrir servidor.
 
-Com Docker e contexto OrbStack disponíveis, execute na raiz. A publicação usa somente loopback e porta aleatória; `port` informa a porta atribuída:
+A API pode iniciar com broker fora e consumir o backlog quando ele voltar.
+Migrations dependem do banco disponível antes da partida quando habilitadas.
+Readiness retorna descrições fixas sem exceções. Fora de Development, logs brutos
+de MassTransit e eventos EF com exceção/stack são suprimidos. Conflitos registram
+somente IDs/versão; não habilite logging de dados sensíveis, payload ou credenciais.
+
+## Container e testes
+
+O Dockerfile usa build multi-stage, SDK/runtime fixados por digest, porta 8080 e
+usuário `app` (UID 1654). Passe as variáveis da tabela por configuração externa;
+o arquivo de ambiente não deve entrar no contexto de build.
 
 ```sh
 docker --context orbstack build -t fcg-notifications:local .
-container=$(docker --context orbstack run -d -p 127.0.0.1::8080 fcg-notifications:local)
+container=$(docker --context orbstack run -d -p 127.0.0.1::8080 \
+  --env-file /caminho/externo/notifications.env fcg-notifications:local)
 docker --context orbstack port "$container" 8080/tcp
-docker --context orbstack inspect --format '{{.State.Health.Status}}' "$container"
-docker --context orbstack exec "$container" cat /proc/1/status
-# Use a porta retornada acima para consultar /health/live e /health/ready.
-# Após a verificação, remova somente o container criado:
+docker --context orbstack exec "$container" dotnet FCG.Notifications.dll --healthcheck
+# Remova somente o recurso criado acima:
 docker --context orbstack rm -f "$container"
 ```
 
-O estado healthy aparece após o probe inicial. Os testes do host verificam isolamento live/ready e o mapeamento de checks falhos; os testes do probe usam servidores HTTP reais locais para sucesso, 503, indisponibilidade e timeout.
-
-Os manifestos Kubernetes serão adicionados na etapa de implantação; veja [k8s](k8s/README.md).
+A conexão configurada precisa alcançar PostgreSQL/RabbitMQ pelo container.
+Os testes usam bancos/roles e filas isolados, PostgreSQL/RabbitMQ reais, verificam
+ordem, duplicatas, conflito durável, concorrência, restart e payload inválido em
+`_error`, além dos contratos/probes herdados. Este incremento não comprova envio de
+boas-vindas, confirmação, compra distribuída, Compose completo ou Kubernetes.

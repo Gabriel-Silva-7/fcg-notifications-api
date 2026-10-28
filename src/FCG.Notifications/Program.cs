@@ -1,6 +1,10 @@
 using FCG.Notifications;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using FCG.Notifications.Messaging;
+using FCG.Notifications.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 if (args is ["--healthcheck"])
 {
@@ -9,8 +13,25 @@ if (args is ["--healthcheck"])
 }
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddHealthChecks();
+var connection = builder.Configuration.GetConnectionString("Default");
+if (string.IsNullOrWhiteSpace(connection)) throw new InvalidOperationException("ConnectionStrings:Default is required for Notifications.");
+builder.Services.AddDbContext<NotificationsDbContext>(options =>
+{
+    options.UseNpgsql(connection);
+    if (!builder.Environment.IsDevelopment())
+        options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.CommandError, RelationalEventId.ConnectionError,
+            CoreEventId.QueryIterationFailed, CoreEventId.SaveChangesFailed));
+});
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+builder.Services.AddNotificationsMessaging(builder.Configuration);
+if (!builder.Environment.IsDevelopment()) builder.Logging.AddFilter("MassTransit", LogLevel.None);
+builder.Services.AddHealthChecks().AddCheck<NotificationStorageHealthCheck>("notifications-storage", tags: ["ready"]);
 var app = builder.Build();
+if (builder.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
+}
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false
