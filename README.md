@@ -2,7 +2,8 @@
 
 Serviço .NET 10 de projeção de identidade e, nos próximos incrementos, notificações
 simuladas no console. Mantém banco próprio: não consulta o banco de Users.
-Este incremento recebe eventos de identidade; ainda não emite e-mails simulados.
+Este incremento recebe eventos de identidade e persiste intenções de boas-vindas;
+a emissão no console pertence ao dispatcher do próximo incremento.
 
 ## Executar
 
@@ -56,7 +57,19 @@ Erros transitórios recebem até três novas tentativas (1s, 5s, 15s), depois se
 para a fila durável `_error`; payload inválido não aplica estado. Interrupção antes
 do commit deixa a mensagem recuperável, e reentregas não revertem a projeção.
 Snapshot de recuperação é estado, sem inventar fato de cadastro ou boas-vindas.
-O processamento de cadastro atrasado será ligado à intenção Welcome separadamente.
+
+## Intenção de boas-vindas
+
+`UserCreatedEvent` válido registra uma única intenção `Welcome` por usuário em
+`NotificationIntents`, na mesma transação da projeção. A unicidade permanente usa
+`Kind` e `BusinessId`, independentemente de MessageId/EventId, restart ou concorrência.
+Uma divergência de identidade registra conflito e não prepara boas-vindas.
+
+Cadastro atrasado usa o contato mais recente já projetado, inclusive de usuário
+excluído; snapshot isolado nunca cria boas-vindas. Ao preparar a intenção como
+`Ready`, nome, e-mail e versão do contato ficam congelados. Mudanças posteriores
+não redirecionam a intenção já preparada. Falha antes do commit desfaz projeção e
+intenção juntas, permitindo reentrega. Ainda não há dispatcher nem emissão no console.
 
 ## Saúde e logs
 
@@ -91,5 +104,6 @@ docker --context orbstack rm -f "$container"
 A conexão configurada precisa alcançar PostgreSQL/RabbitMQ pelo container.
 Os testes usam bancos/roles e filas isolados, PostgreSQL/RabbitMQ reais, verificam
 ordem, duplicatas, conflito durável, concorrência, restart e payload inválido em
-`_error`, além dos contratos/probes herdados. Este incremento não comprova envio de
+`_error`, intenções únicas, contato congelado e rollback atômico, além dos
+contratos/probes herdados. Este incremento não comprova envio de
 boas-vindas, confirmação, compra distribuída, Compose completo ou Kubernetes.

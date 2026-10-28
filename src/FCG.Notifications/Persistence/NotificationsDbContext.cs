@@ -7,6 +7,7 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
 {
     public DbSet<UserContact> UserContacts => Set<UserContact>();
     public DbSet<MessageConflict> MessageConflicts => Set<MessageConflict>();
+    public DbSet<NotificationIntent> NotificationIntents => Set<NotificationIntent>();
     protected override void OnModelCreating(ModelBuilder model)
     {
         model.Entity<UserContact>(entity =>
@@ -27,6 +28,20 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
             entity.Property(x => x.Reason).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Payload).IsRequired();
             entity.Property(x => x.PayloadHash).HasMaxLength(64).IsRequired();
+        });
+        model.Entity<NotificationIntent>(entity =>
+        {
+            entity.ToTable("NotificationIntents", table =>
+            {
+                table.HasCheckConstraint("CK_NotificationIntents_ReadyContact",
+                    "\"State\" = 'PendingContact' OR (\"RecipientName\" IS NOT NULL AND \"RecipientEmail\" IS NOT NULL AND \"ContactEventVersion\" IS NOT NULL AND \"ContactEventVersion\" > 0)");
+            });
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.Kind, x.BusinessId }).IsUnique();
+            entity.HasIndex(x => new { x.State, x.CreatedAtUtc });
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(40);
+            entity.Property(x => x.State).HasConversion<string>().HasMaxLength(30);
+            entity.Property(x => x.RecipientEmail).HasMaxLength(256);
         });
     }
 }

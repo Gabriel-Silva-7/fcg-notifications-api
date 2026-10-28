@@ -43,6 +43,14 @@ public sealed class IdentityProjectionHandler(NotificationsDbContext db, TimePro
             conflict.LastSeenAtUtc = clock.GetUtcNow();
             logger.LogWarning("IdentityProjectionConflict {UserId} {EventId} {EventVersion}", incoming.UserId, incoming.EventId, incoming.EventVersion);
         }
+        // An old registration remains a fact even if a newer projection already exists.
+        // Recovery snapshots never imply a registration or a welcome intent.
+        if (incoming is UserCreatedEvent && decision != ProjectionDecision.Conflict
+            && !await db.NotificationIntents.AnyAsync(x => x.Kind == NotificationKind.Welcome && x.BusinessId == incoming.UserId, cancellationToken))
+        {
+            db.NotificationIntents.Add(NotificationIntent.Welcome(contact
+                ?? throw new InvalidOperationException("Registration contact is unavailable."), clock.GetUtcNow()));
+        }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return decision;

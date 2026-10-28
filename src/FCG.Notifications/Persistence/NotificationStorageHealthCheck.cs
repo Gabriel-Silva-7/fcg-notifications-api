@@ -11,6 +11,7 @@ public sealed class NotificationStorageHealthCheck(NotificationsDbContext db) : 
         {
             await db.UserContacts.AsNoTracking().Take(1).ToArrayAsync(cancellationToken);
             await db.MessageConflicts.AsNoTracking().Take(1).ToArrayAsync(cancellationToken);
+            await db.NotificationIntents.AsNoTracking().Take(1).ToArrayAsync(cancellationToken);
             return HealthCheckResult.Healthy();
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)

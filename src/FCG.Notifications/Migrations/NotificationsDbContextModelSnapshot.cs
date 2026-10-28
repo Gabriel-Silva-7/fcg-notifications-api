@@ -82,6 +82,57 @@ namespace FCG.Notifications.Migrations
                     b.ToTable("MessageConflicts");
                 });
 
+            modelBuilder.Entity("FCG.Notifications.Persistence.NotificationIntent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("ContactEventVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset?>("PreparedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RecipientEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("RecipientName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "BusinessId")
+                        .IsUnique();
+
+                    b.HasIndex("State", "CreatedAtUtc");
+
+                    b.ToTable("NotificationIntents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_NotificationIntents_ReadyContact", "\"State\" = 'PendingContact' OR (\"RecipientName\" IS NOT NULL AND \"RecipientEmail\" IS NOT NULL AND \"ContactEventVersion\" IS NOT NULL AND \"ContactEventVersion\" > 0)");
+                        });
+                });
+
             modelBuilder.Entity("FCG.Notifications.Persistence.UserContact", b =>
                 {
                     b.Property<Guid>("UserId")
