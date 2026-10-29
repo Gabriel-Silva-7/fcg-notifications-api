@@ -14,9 +14,17 @@ public sealed class PaymentNotificationHandler(NotificationsDbContext db, TimePr
         ArgumentNullException.ThrowIfNull(incoming);
         db.ChangeTracker.Clear();
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var result = await HandleInTransactionAsync(incoming, transportId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result.Decision;
+    }
+
+    internal async Task<(ProjectionDecision Decision, string? Reason)> HandleInTransactionAsync(PaymentProcessedEvent incoming, Guid? transportId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(incoming);
+        if (db.Database.CurrentTransaction is null) throw new InvalidOperationException("Notification application requires its owner's transaction.");
         await NotificationLocks.AcquireAsync(db, "order:" + incoming.OrderId, cancellationToken);
-        var current = await db.PaymentObservations.SingleOrDefaultAsync(x => x.OrderId == incoming.OrderId, cancellationToken);
-        var decision = current is null ? ProjectionDecision.Apply : current.Snapshot() == incoming ? ProjectionDecision.Ignore : ProjectionDecision.Conflict;
+        var (decision, conflictReason) = await DecideAsync(db, incoming, cancellationToken);
         if (decision == ProjectionDecision.Apply)
         {
             db.PaymentObservations.Add(PaymentObservation.From(incoming));
@@ -41,14 +49,25 @@ public sealed class PaymentNotificationHandler(NotificationsDbContext db, TimePr
             {
                 conflict = new MessageConflict { Id = Guid.NewGuid(), Kind = "Payment", BusinessId = incoming.OrderId,
                     MessageType = nameof(PaymentProcessedEvent), TransportMessageId = transportId,
-                    Reason = "DivergentPaymentResult", Payload = payload, PayloadHash = hash, FirstSeenAtUtc = clock.GetUtcNow() };
+                    Reason = conflictReason!, Payload = payload, PayloadHash = hash, FirstSeenAtUtc = clock.GetUtcNow() };
                 db.MessageConflicts.Add(conflict);
             }
             conflict.Observations++; conflict.LastSeenAtUtc = clock.GetUtcNow();
             logger.LogWarning("PaymentObservationConflict {OrderId} {MessageId}", incoming.OrderId, transportId);
         }
         await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return decision;
+        return (decision, conflictReason);
+    }
+
+    internal static async Task<(ProjectionDecision Decision, string? Reason)> DecideAsync(NotificationsDbContext db, PaymentProcessedEvent incoming, CancellationToken ct)
+    {
+        var current = await db.PaymentObservations.AsNoTracking().SingleOrDefaultAsync(x => x.OrderId == incoming.OrderId, ct);
+        if (current is null)
+        {
+            if (await db.NotificationIntents.AsNoTracking().AnyAsync(x => x.Kind == NotificationKind.PurchaseConfirmation && x.BusinessId == incoming.OrderId, ct))
+                return (ProjectionDecision.Conflict, "ExistingIntentWithoutPaymentObservation");
+            return (ProjectionDecision.Apply, null);
+        }
+        return current.Snapshot() == incoming ? (ProjectionDecision.Ignore, null) : (ProjectionDecision.Conflict, "DivergentPaymentResult");
     }
 }

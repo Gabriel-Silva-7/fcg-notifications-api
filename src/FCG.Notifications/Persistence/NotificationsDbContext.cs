@@ -6,6 +6,7 @@ namespace FCG.Notifications.Persistence;
 public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> options) : DbContext(options)
 {
     public DbSet<NotificationAttempt> NotificationAttempts => Set<NotificationAttempt>();
+    public DbSet<RecoveryAttempt> RecoveryAttempts => Set<RecoveryAttempt>();
     public DbSet<PaymentObservation> PaymentObservations => Set<PaymentObservation>();
     public DbSet<UserContact> UserContacts => Set<UserContact>();
     public DbSet<MessageConflict> MessageConflicts => Set<MessageConflict>();
@@ -38,6 +39,20 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
             entity.HasIndex(x => new { x.IntentId, x.LeaseVersion }).IsUnique();
             entity.Property(x => x.Result).HasMaxLength(30).IsRequired();
             entity.HasOne<NotificationIntent>().WithMany().HasForeignKey(x => x.IntentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<RecoveryAttempt>(entity =>
+        {
+            entity.ToTable("RecoveryAttempts", table => table.HasCheckConstraint("CK_RecoveryAttempts_Target",
+                "(\"Operation\"='ReplayConflict' AND \"ConflictId\" IS NOT NULL AND \"IntentId\" IS NULL) OR (\"Operation\"='ResumeIntent' AND \"IntentId\" IS NOT NULL AND \"ConflictId\" IS NULL)"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Operation).HasMaxLength(30);
+            entity.Property(x => x.Outcome).HasMaxLength(40);
+            entity.Property(x => x.Reason).HasMaxLength(80);
+            entity.HasOne<MessageConflict>().WithMany().HasForeignKey(x => x.ConflictId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<NotificationIntent>().WithMany().HasForeignKey(x => x.IntentId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.ConflictId, x.AttemptedAtUtc });
+            entity.HasIndex(x => new { x.IntentId, x.AttemptedAtUtc });
         });
         model.Entity<PaymentObservation>(entity =>
         {

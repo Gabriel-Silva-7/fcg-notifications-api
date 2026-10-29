@@ -9,6 +9,7 @@ public sealed class NotificationStorageHealthCheck(NotificationsDbContext db) : 
     {
         try
         {
+            await db.RecoveryAttempts.AsNoTracking().Take(1).ToArrayAsync(cancellationToken);
             await db.NotificationAttempts.AsNoTracking().Take(1).ToArrayAsync(cancellationToken);
             await db.PaymentObservations.AsNoTracking().Take(1).ToArrayAsync(cancellationToken);
             await db.UserContacts.AsNoTracking().Take(1).ToArrayAsync(cancellationToken);

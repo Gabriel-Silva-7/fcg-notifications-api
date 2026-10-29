@@ -13,6 +13,15 @@ public sealed class IdentityProjectionHandler(NotificationsDbContext db, TimePro
         IdentitySnapshotValidation.Validate(incoming);
         db.ChangeTracker.Clear();
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var decision = await HandleInTransactionAsync(incoming, transportId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return decision;
+    }
+
+    internal async Task<ProjectionDecision> HandleInTransactionAsync(IdentitySnapshot incoming, Guid? transportId, CancellationToken cancellationToken)
+    {
+        IdentitySnapshotValidation.Validate(incoming);
+        if (db.Database.CurrentTransaction is null) throw new InvalidOperationException("Notification application requires its owner's transaction.");
         await NotificationLocks.AcquireAsync(db, "user:" + incoming.UserId, cancellationToken);
         var contact = await db.UserContacts.SingleOrDefaultAsync(x => x.UserId == incoming.UserId, cancellationToken);
         var decision = IdentityProjectionPolicy.Evaluate(contact?.Snapshot(), incoming, ProjectionAudience.Notifications);
@@ -60,7 +69,6 @@ public sealed class IdentityProjectionHandler(NotificationsDbContext db, TimePro
                 await PendingContactReconciler.PrepareAsync(db, id, clock.GetUtcNow(), cancellationToken, contact);
         }
         await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
         return decision;
     }
 }

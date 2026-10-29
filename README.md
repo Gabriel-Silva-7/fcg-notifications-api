@@ -168,3 +168,45 @@ contratos/probes herdados. Este incremento não comprova compra distribuída, Co
 Os testes anteriores removem somente o worker hospedado para inspecionar contratos
 dos incrementos de persistência. Os cenários do dispatcher ativam o worker real ou
 controlam relógio e pulsos com PostgreSQL real, ledger e captura do logger real.
+
+## Operação local de recuperação
+
+O executável da imagem também aceita comandos locais com apenas a conexão do
+próprio banco. Esse modo não inicia HTTP, broker, dispatcher, migrations ou seed.
+O schema deve ser provisionado pelo procedimento normal do ambiente.
+
+```sh
+dotnet FCG.Notifications.dll recover-notifications conflicts --limit 20
+dotnet FCG.Notifications.dll recover-notifications conflict --id <conflict-guid>
+dotnet FCG.Notifications.dll recover-notifications replay --id <conflict-guid> --dry-run
+dotnet FCG.Notifications.dll recover-notifications replay --id <conflict-guid> --apply
+dotnet FCG.Notifications.dll recover-notifications intents --limit 20
+dotnet FCG.Notifications.dll recover-notifications intent --id <intent-guid>
+dotnet FCG.Notifications.dll recover-notifications resume --id <intent-guid> --apply
+```
+
+Prévia é o padrão: snapshot read-only, sem efeito, contador ou registro de tentativa.
+A previsão pode mudar antes da aplicação. List/show exibem metadados de conflito,
+estado e tentativas, sem payload, nome/e-mail de destinatário ou corpo de mensagem.
+O replay valida tipo/hash/identificadores/versão e chama a mesma regra do consumidor.
+Efeito, resolução e RecoveryAttempt confirmam juntos; erro no commit reverte tudo.
+Conflito persistente mantém o primeiro terminal e seu diagnóstico. Uma confirmação
+existente sem a observação correspondente é restauração inconsistente: permanece
+em conflito até restaurar a observação original, sem escolher outro terminal. Não editar payload
+ou apagar um terminal para escolher outra decisão. Restauração é um procedimento
+separado do dono, a partir de fonte consistente.
+
+Resume pode preparar PendingContact se o contato já existe, ou antecipar o retry
+de Ready em backoff. Não modifica o destinatário de Ready. Lease ativo retorna
+LeaseActive; expirado continua disponível ao dispatcher normal, que registra a
+tentativa abandonada antes de tomar nova posse. Sent retorna AlreadySent. O comando
+não emite e-mail nem escreve Sent: a entrega continua pelo dispatcher, com a mesma
+garantia de console ao menos uma vez em falhas. Tentativas do operador ficam em
+RecoveryAttempts, separadas das tentativas de entrega em NotificationAttempts.
+
+Códigos de saída:0 sucesso/estado já atendido;1 falha segura;2 argumento inválido;
+3 alvo ausente;4 conflito, contato ausente ou lease ativo. Snapshots de identidade
+não geram Welcome; um fato de cadastro atrasado continua sujeito à deduplicação
+por usuário. `_error` usa redrive de transporte separado, sem substituir o replay
+local de um conflito já confirmado. A migração RecoveryOperations e sua tabela
+fazem parte da readiness.

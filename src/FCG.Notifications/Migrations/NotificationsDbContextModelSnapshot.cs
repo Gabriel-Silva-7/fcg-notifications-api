@@ -234,6 +234,46 @@ namespace FCG.Notifications.Migrations
                     b.ToTable("PaymentObservations");
                 });
 
+            modelBuilder.Entity("FCG.Notifications.Persistence.RecoveryAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AttemptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConflictId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("IntentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConflictId", "AttemptedAtUtc");
+
+                    b.HasIndex("IntentId", "AttemptedAtUtc");
+
+                    b.ToTable("RecoveryAttempts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RecoveryAttempts_Target", "(\"Operation\"='ReplayConflict' AND \"ConflictId\" IS NOT NULL AND \"IntentId\" IS NULL) OR (\"Operation\"='ResumeIntent' AND \"IntentId\" IS NOT NULL AND \"ConflictId\" IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("FCG.Notifications.Persistence.UserContact", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -286,6 +326,19 @@ namespace FCG.Notifications.Migrations
                         .HasForeignKey("IntentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FCG.Notifications.Persistence.RecoveryAttempt", b =>
+                {
+                    b.HasOne("FCG.Notifications.Persistence.MessageConflict", null)
+                        .WithMany()
+                        .HasForeignKey("ConflictId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FCG.Notifications.Persistence.NotificationIntent", null)
+                        .WithMany()
+                        .HasForeignKey("IntentId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 #pragma warning restore 612, 618
         }

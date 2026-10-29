@@ -7,6 +7,17 @@ using FCG.Notifications.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
+if (args.FirstOrDefault() == "recover-notifications")
+{
+    Environment.ExitCode = await FCG.Notifications.Operations.RecoveryCommand.RunAsync(args[1..]);
+    return;
+}
+if (args.Length > 0 && !args[0].StartsWith('-'))
+{
+    Console.Error.WriteLine("Usage: recover-notifications conflicts|intents | conflict|intent|replay|resume --id GUID");
+    Environment.ExitCode = 2;
+    return;
+}
 if (args is ["--healthcheck"])
 {
     Environment.ExitCode = await ContainerProbe.RunAsync(new Uri("http://127.0.0.1:8080/health/ready"));
@@ -25,6 +36,7 @@ builder.Services.AddDbContext<NotificationsDbContext>(options =>
 });
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddNotificationsMessaging(builder.Configuration);
+builder.Services.AddScoped<FCG.Notifications.Processing.NotificationRecoveryService>();
 var dispatcherOptions = builder.Configuration.GetSection("Dispatcher").Get<DispatcherOptions>() ?? new();
 dispatcherOptions.Validate();
 builder.Services.AddSingleton(dispatcherOptions);
