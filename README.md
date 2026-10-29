@@ -14,6 +14,7 @@ externo de segredos:
 | Variável | Comportamento |
 |---|---|
 | `ConnectionStrings__Default` | Banco exclusivo Notifications, obrigatório |
+| `PGGSSENCMODE` | Perfil local: `disable`, passado ao Npgsql para autenticação por senha sem dependência Kerberos; não altera `SslMode` |
 | `RabbitMq__Host` | Host/IP do broker, obrigatório, sem URL com credenciais |
 | `RabbitMq__Port` | AMQP, padrão 5672 |
 | `RabbitMq__VirtualHost` | `/fcg`, obrigatório |
@@ -95,8 +96,7 @@ Sua seleção ignora contatos ainda ausentes para evitar que bloqueiem outros pe
 
 Novos diagnósticos preservam o tipo concreto da mensagem e o payload original.
 O campo vazio em diagnósticos anteriores à migration significa procedência
-indeterminada; não se infere cadastro de snapshot. Replay operacional ainda não
-está exposto. Migrations acrescentam observações/metadata e ampliam a chave do
+indeterminada; não se infere cadastro de snapshot. Replay operacional é oferecido pela CLI local descrita abaixo; não há endpoint HTTP de recuperação. Migrations acrescentam observações/metadata e ampliam a chave do
 conflito com o tipo, preservando registros existentes.
 
 ## Dispatcher e recuperação
@@ -163,7 +163,7 @@ A conexão configurada precisa alcançar PostgreSQL/RabbitMQ pelo container.
 Os testes usam bancos/roles e filas isolados, PostgreSQL/RabbitMQ reais, verificam
 ordem, duplicatas, conflito durável, concorrência, restart e payload inválido em
 `_error`, intenções únicas, contato congelado e rollback atômico, além dos
-contratos/probes herdados. Este incremento não comprova compra distribuída, Compose completo ou Kubernetes.
+contratos/probes herdados. A compra distribuída em Compose e Kubernetes é verificada separadamente pela orquestração.
 
 Os testes anteriores removem somente o worker hospedado para inspecionar contratos
 dos incrementos de persistência. Os cenários do dispatcher ativam o worker real ou
@@ -186,7 +186,7 @@ dotnet FCG.Notifications.dll recover-notifications resume --id <intent-guid> --a
 ```
 
 Prévia é o padrão: snapshot read-only, sem efeito, contador ou registro de tentativa.
-A previsão pode mudar antes da aplicação. List/show exibem metadados de conflito,
+A previsão pode mudar antes da aplicação. Os comandos `conflicts`/`conflict` e `intents`/`intent` exibem metadados de conflito,
 estado e tentativas, sem payload, nome/e-mail de destinatário ou corpo de mensagem.
 O replay valida tipo/hash/identificadores/versão e chama a mesma regra do consumidor.
 Efeito, resolução e RecoveryAttempt confirmam juntos; erro no commit reverte tudo.
@@ -212,3 +212,7 @@ local de um conflito já confirmado. A migração RecoveryOperations e sua tabel
 fazem parte da readiness.
 
 [Manifestos Kubernetes próprios](k8s/README.md) para renderização e implantação pela orquestração.
+
+## Ambiente integrado
+
+A [orquestração](https://github.com/Gabriel-Silva-7/fcg-orchestration) prepara fontes limpas, credenciais locais, banco e broker; seus guias descrevem Compose, Kind, jornada real e recuperação. Use as revisões selecionadas da combinação, pois o README não certifica acesso público nem integração em `main`. Este repositório contém apenas o código e os dados de sua responsabilidade.
