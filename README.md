@@ -210,3 +210,5 @@ não geram Welcome; um fato de cadastro atrasado continua sujeito à deduplicaç
 por usuário. `_error` usa redrive de transporte separado, sem substituir o replay
 local de um conflito já confirmado. A migração RecoveryOperations e sua tabela
 fazem parte da readiness.
+
+[Manifestos Kubernetes próprios](k8s/README.md) para renderização e implantação pela orquestração.
