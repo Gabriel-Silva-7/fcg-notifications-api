@@ -216,3 +216,11 @@ fazem parte da readiness.
 ## Ambiente integrado
 
 A [orquestração](https://github.com/Gabriel-Silva-7/fcg-orchestration) prepara fontes limpas, credenciais locais, banco e broker; seus guias descrevem Compose, Kind, jornada real e recuperação. Use as revisões selecionadas da combinação, pois o README não certifica acesso público nem integração em `main`. Este repositório contém apenas o código e os dados de sua responsabilidade.
+
+## Limite de portabilidade
+
+A validação disponível foi executada em **darwin-arm64 com Docker no contexto
+OrbStack**; os containers executam linux/arm64. O preparo de Kind/kubectl também
+é específico desse alvo. Não foi validada a reprodução em Linux, Windows, x86_64
+ou outra engine/contexto Docker. Esses alvos exigem adaptar e testar ferramentas,
+acesso ao Docker, permissões/mounts e imagens antes de afirmar suporte.
