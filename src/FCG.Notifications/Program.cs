@@ -43,7 +43,12 @@ builder.Services.AddSingleton(dispatcherOptions);
 builder.Services.AddSingleton<INotificationSink, ConsoleNotificationSink>();
 builder.Services.AddScoped<NotificationDispatcher>();
 builder.Services.AddHostedService<NotificationWorker>();
-if (!builder.Environment.IsDevelopment()) builder.Logging.AddFilter("MassTransit", LogLevel.None);
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddFilter("MassTransit", LogLevel.None);
+    // O framework inclui caminho/query brutos nos logs HTTP; podem conter dados sensíveis.
+    builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.None);
+}
 builder.Services.AddHealthChecks().AddCheck<NotificationStorageHealthCheck>("notifications-storage", tags: ["ready"]);
 var app = builder.Build();
 if (builder.Configuration.GetValue<bool>("Database:MigrateOnStartup"))

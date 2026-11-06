@@ -139,7 +139,7 @@ pendentes, sem marcar envio fictício. Não remover linhas/ledger para forçar r
 
 A API pode iniciar com broker fora e consumir o backlog quando ele voltar.
 Migrations dependem do banco disponível antes da partida quando habilitadas.
-Readiness retorna descrições fixas sem exceções. Fora de Development, logs brutos
+Readiness retorna descrições fixas sem exceções. Fora de Development, logs HTTP do framework (incluindo query strings), logs brutos
 de MassTransit e eventos EF com exceção/stack são suprimidos. Conflitos registram
 somente IDs/versão; não habilite logging de dados sensíveis, payload ou credenciais.
 
@@ -165,8 +165,8 @@ ordem, duplicatas, conflito durável, concorrência, restart e payload inválido
 `_error`, intenções únicas, contato congelado e rollback atômico, além dos
 contratos/probes herdados. A compra distribuída em Compose e Kubernetes é verificada separadamente pela orquestração.
 
-Os testes anteriores removem somente o worker hospedado para inspecionar contratos
-dos incrementos de persistência. Os cenários do dispatcher ativam o worker real ou
+Os testes de projeção removem somente o worker hospedado para inspecionar
+os contratos de persistência. Os cenários do dispatcher ativam o worker real ou
 controlam relógio e pulsos com PostgreSQL real, ledger e captura do logger real.
 
 ## Operação local de recuperação
@@ -215,7 +215,7 @@ fazem parte da readiness.
 
 ## Ambiente integrado
 
-A [orquestração](https://github.com/Gabriel-Silva-7/fcg-orchestration) prepara fontes limpas, credenciais locais, banco e broker; seus guias descrevem Compose, Kind, jornada real e recuperação. Use as revisões selecionadas da combinação, pois o README não certifica acesso público nem integração em `main`. Este repositório contém apenas o código e os dados de sua responsabilidade.
+A [orquestração](https://github.com/Gabriel-Silva-7/fcg-orchestration) prepara fontes limpas, credenciais locais, banco e broker; seus guias descrevem Compose, Kind, jornada real e recuperação. Use os cinco SHAs registrados no ambiente para identificar a combinação executada. As URLs identificam as origens; disponibilidade remota dos commits e acesso externo exigem conferência separada. Este repositório contém apenas o código e os dados de sua responsabilidade.
 
 ## Limite de portabilidade
 
