@@ -204,8 +204,8 @@ não emite e-mail nem escreve Sent: a entrega continua pelo dispatcher, com a me
 garantia de console ao menos uma vez em falhas. Tentativas do operador ficam em
 RecoveryAttempts, separadas das tentativas de entrega em NotificationAttempts.
 
-Códigos de saída:0 sucesso/estado já atendido;1 falha segura;2 argumento inválido;
-3 alvo ausente;4 conflito, contato ausente ou lease ativo. Snapshots de identidade
+Códigos de saída: 0 sucesso/estado já atendido; 1 falha segura; 2 argumento inválido;
+3 alvo ausente; 4 conflito, contato ausente ou lease ativo. Snapshots de identidade
 não geram Welcome; um fato de cadastro atrasado continua sujeito à deduplicação
 por usuário. `_error` usa redrive de transporte separado, sem substituir o replay
 local de um conflito já confirmado. A migração RecoveryOperations e sua tabela
