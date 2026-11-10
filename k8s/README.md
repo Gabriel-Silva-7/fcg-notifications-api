@@ -11,8 +11,8 @@ carrega a imagem local identificada e só aplica a fase das aplicações depois 
 rollouts PostgreSQL/RabbitMQ e do Job de topologia Complete. Leia o guia Kubernetes
 da orquestração para preparo, contexto/kubeconfig privados e fases do apply.
 
-Deployment executa UID1654, com startup/liveness em `/health/live` e readiness em
-`/health/ready`. Service interno usa porta80 para8080. Migrations próprias entram
+Deployment executa UID 1654, com startup/liveness em `/health/live` e readiness em
+`/health/ready`. Service interno usa porta 80 para 8080. Migrations próprias entram
 antes de servir/bus; DB e broker são acessados pelos Services postgres/rabbitmq.
 Secrets reais e chaves são gerados fora do Git; ConfigMap contém apenas parâmetros
 públicos. Mudança de revisão troca referências no PodTemplate e exige rollout.

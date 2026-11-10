@@ -21,9 +21,9 @@ externo de segredos:
 | `RabbitMq__Username` / `RabbitMq__Password` | Credencial própria, obrigatória, sem valor padrão |
 | `Queues__Payments` | Fila própria de resultados; padrão `fcg-notifications-payments`, distinta da fila de identidade |
 | `Queues__Identity` | Fila própria durável; padrão `fcg-notifications-identity` |
-| `Dispatcher__PollSeconds` | Pulso do worker, padrão1, intervalo1–60s |
-| `Dispatcher__LeaseSeconds` | Posse recuperável, padrão30, intervalo1–3600s |
-| `Dispatcher__BackoffSeconds` | Espera após falha de emissão, padrão5, intervalo1–3600s |
+| `Dispatcher__PollSeconds` | Pulso do worker, padrão 1, intervalo 1–60s |
+| `Dispatcher__LeaseSeconds` | Posse recuperável, padrão 30, intervalo 1–3600s |
+| `Dispatcher__BackoffSeconds` | Espera após falha de emissão, padrão 5, intervalo 1–3600s |
 | `Database__MigrateOnStartup` | `true` aplica migrations antes de atender; padrão `false` |
 
 Use role PostgreSQL própria, sem superuser/criação de bancos/roles. Para migrar,
@@ -91,7 +91,7 @@ Contato conhecido, inclusive Deleted, prepara Ready e congela destinatário/vers
 Sem contato, fica PendingContact sem destinatário inventado. Eventos de identidade
 preparam pendências existentes com o contato efetivo daquela transação.
 `PendingContactReconciler` também recupera pendências sem novo evento; o worker
-hospedado o aciona em cada pulso antes de despachar até25 intenções.
+hospedado o aciona em cada pulso antes de despachar até 25 intenções.
 Sua seleção ignora contatos ainda ausentes para evitar que bloqueiem outros pedidos.
 
 Novos diagnósticos preservam o tipo concreto da mensagem e o payload original.
