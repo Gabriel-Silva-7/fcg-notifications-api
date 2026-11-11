@@ -22,7 +22,7 @@ public sealed class WelcomeIntentTests(NotificationFixture fixture)
         Assert.Equal("Ready", await app.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\""));
         Assert.Equal("person@example.com", await app.ScalarAsync("SELECT \"RecipientEmail\" FROM \"NotificationIntents\""));
         Assert.Equal(1L, await app.ScalarAsync("SELECT \"ContactEventVersion\" FROM \"NotificationIntents\""));
-        Assert.DoesNotContain("[E-MAIL SIMULADO]", string.Join('\n', app.Logs.Entries));
+        Assert.DoesNotContain("assunto:", string.Join('\n', app.Logs.Entries));
     }
 
     [Fact]

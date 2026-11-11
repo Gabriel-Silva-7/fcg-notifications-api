@@ -12,15 +12,32 @@ public interface INotificationSink
 
 public sealed class ConsoleNotificationSink(ILogger<ConsoleNotificationSink> logger) : INotificationSink
 {
+    public const string WelcomeSubject = "Boas-vindas ao FIAP Cloud Games";
+    public const string PurchaseSubject = "Confirmação de compra no FIAP Cloud Games";
+
     public Task EmitAsync(NotificationDelivery delivery, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!logger.IsEnabled(LogLevel.Information))
             throw new InvalidOperationException("Notification emission logging is disabled.");
-        logger.LogInformation("[E-MAIL SIMULADO] {Kind} IntentId={IntentId} AttemptId={AttemptId} UserId={UserId} OrderId={OrderId} GameId={GameId} Price={Price} Para={Recipient}",
-            delivery.Kind, delivery.IntentId, delivery.AttemptId, delivery.UserId,
-            delivery.Kind == NotificationKind.PurchaseConfirmation ? delivery.BusinessId : (Guid?)null,
-            delivery.GameId, delivery.Price, delivery.MaskedRecipient);
+
+        if (delivery.Kind == NotificationKind.Welcome)
+        {
+            logger.LogInformation(
+                "e-mail de boas-vindas enviado para {Recipient}, assunto: {Subject}, {Body}",
+                delivery.MaskedRecipient,
+                WelcomeSubject,
+                "Sua conta no FIAP Cloud Games foi criada com sucesso.");
+        }
+        else
+        {
+            logger.LogInformation(
+                "e-mail de confirmação de compra enviado para {Recipient}, assunto: {Subject}, {Body}",
+                delivery.MaskedRecipient,
+                PurchaseSubject,
+                $"Sua compra foi confirmada. Pedido: {delivery.BusinessId}. Jogo: {delivery.GameId}. Preço: {delivery.Price}.");
+        }
+
         return Task.CompletedTask;
     }
 }

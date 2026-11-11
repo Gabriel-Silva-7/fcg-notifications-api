@@ -34,7 +34,7 @@ public sealed class NotificationRecoveryTests(NotificationFixture fixture)
         Assert.Equal(1L, await app.ScalarAsync("SELECT count(*) FROM \"NotificationIntents\" WHERE \"Kind\"='PurchaseConfirmation'"));
         Assert.Equal(3L, await app.ScalarAsync("SELECT count(*) FROM \"RecoveryAttempts\""));
         Assert.Equal(true, await app.ScalarAsync("SELECT \"Resolved\" FROM \"MessageConflicts\""));
-        Assert.DoesNotContain(app.Logs.Entries, line => line.Contains("[E-MAIL SIMULADO]", StringComparison.Ordinal));
+        Assert.DoesNotContain(app.Logs.Entries, line => line.Contains("assunto:", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -131,7 +131,7 @@ public sealed class NotificationRecoveryTests(NotificationFixture fixture)
         await worker.ServiceProvider.GetRequiredService<INotificationSink>().EmitAsync(delivery, CancellationToken.None);
         Assert.True(await dispatcher.CompleteAsync(delivery, CancellationToken.None)); intentBefore = await IntentFingerprint(app);
         Assert.Equal("AlreadySent", (await Resume(app, id, true)).Outcome); Assert.Equal(intentBefore, await IntentFingerprint(app));
-        Assert.Single(app.Logs.Entries, line => line.Contains("[E-MAIL SIMULADO]", StringComparison.Ordinal));
+        Assert.Single(app.Logs.Entries, line => line.Contains("assunto:", StringComparison.Ordinal));
         Assert.Equal(1L, await app.ScalarAsync("SELECT count(*) FROM \"NotificationAttempts\""));
     }
 
@@ -165,7 +165,7 @@ public sealed class NotificationRecoveryTests(NotificationFixture fixture)
         Assert.Equal("Prepared", (await Resume(app, id, true)).Outcome);
         Assert.Equal("Ready", await app.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\""));
         Assert.Equal(3L, await app.ScalarAsync("SELECT \"ContactEventVersion\" FROM \"NotificationIntents\""));
-        Assert.DoesNotContain(app.Logs.Entries, line => line.Contains("[E-MAIL SIMULADO]", StringComparison.Ordinal));
+        Assert.DoesNotContain(app.Logs.Entries, line => line.Contains("assunto:", StringComparison.Ordinal));
         using var worker = app.Services.CreateScope(); Assert.True(await worker.ServiceProvider.GetRequiredService<NotificationDispatcher>().DispatchNextAsync(CancellationToken.None));
         Assert.Equal("Sent", await app.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\""));
         Assert.DoesNotContain("retained@example.com", string.Join('\n', app.Logs.Entries));

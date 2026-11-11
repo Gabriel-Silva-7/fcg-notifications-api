@@ -20,7 +20,7 @@ public sealed class DispatcherTests(NotificationFixture fixture)
     {
         await using var app = await fixture.CreateAsync(); app.RunDispatcher = true; using var client = app.CreateClient();
         await Apply(app, WelcomeIntentTests.Created(Guid.NewGuid()));
-        await Eventually(() => Task.FromResult(app.Logs.Entries.Any(x => x.Contains("[E-MAIL SIMULADO]"))));
+        await Eventually(() => Task.FromResult(app.Logs.Entries.Any(x => x.Contains("assunto:"))));
         await Eventually(async () => Equals("Sent", await app.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\"")));
         Assert.Equal("Sent", await app.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\""));
         Assert.DoesNotContain("person@example.com", string.Join('\n', app.Logs.Entries));
@@ -39,8 +39,8 @@ public sealed class DispatcherTests(NotificationFixture fixture)
         await using var restarted = new NotificationFactory(app.ConnectionString, fixture.BrokerSettings) { RunDispatcher = true };
         using var restartedClient = restarted.CreateClient();
         await Eventually(async () => Equals("Sent", await restarted.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\"")));
-        var emitted = Assert.Single(restarted.Logs.Entries, x => x.Contains("[E-MAIL SIMULADO]"));
-        Assert.Contains("PurchaseConfirmation", emitted); Assert.Contains("l***@example.com", emitted);
+        var emitted = Assert.Single(restarted.Logs.Entries, x => x.Contains("assunto:"));
+        Assert.Contains("Confirmação de compra no FIAP Cloud Games", emitted); Assert.Contains("l***@example.com", emitted);
         Assert.DoesNotContain("latest@example.com", emitted);
         Assert.Equal(3L, await restarted.ScalarAsync("SELECT \"ContactEventVersion\" FROM \"NotificationIntents\""));
     }
@@ -81,15 +81,14 @@ public sealed class DispatcherTests(NotificationFixture fixture)
         using var client = app.CreateClient(); await Apply(app, WelcomeIntentTests.Created(Guid.NewGuid()));
         using (var scope = app.Services.CreateScope())
             await Assert.ThrowsAsync<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<NotificationDispatcher>().DispatchNextAsync(CancellationToken.None));
-        Assert.Single(app.Logs.Entries, x => x.Contains("[E-MAIL SIMULADO]"));
+        Assert.Single(app.Logs.Entries, x => x.Contains("assunto:"));
         Assert.Equal("Sending", await app.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\""));
         Assert.Equal(DBNull.Value, await app.ScalarAsync("SELECT \"SentAtUtc\" FROM \"NotificationIntents\""));
-        var stableId = await app.ScalarAsync("SELECT \"Id\" FROM \"NotificationIntents\"");
         clock.Advance(TimeSpan.FromSeconds(31));
         using (var scope = app.Services.CreateScope())
             Assert.True(await scope.ServiceProvider.GetRequiredService<NotificationDispatcher>().DispatchNextAsync(CancellationToken.None));
-        var logs = app.Logs.Entries.Where(x => x.Contains("[E-MAIL SIMULADO]")).ToArray(); Assert.Equal(2, logs.Length);
-        Assert.All(logs, entry => Assert.Contains(stableId!.ToString()!, entry)); Assert.NotEqual(logs[0], logs[1]);
+        var logs = app.Logs.Entries.Where(x => x.Contains("assunto:")).ToArray(); Assert.Equal(2, logs.Length);
+        Assert.All(logs, entry => Assert.Contains("e-mail de boas-vindas enviado para", entry));
         Assert.Equal("Sent", await app.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\""));
         Assert.Equal(2L, await app.ScalarAsync("SELECT count(*) FROM \"NotificationAttempts\""));
     }
@@ -107,13 +106,13 @@ public sealed class DispatcherTests(NotificationFixture fixture)
         using var client = app.CreateClient(); var user = Guid.NewGuid(); await Apply(app, WelcomeIntentTests.Created(user));
         using var scope = app.Services.CreateScope(); var dispatcher = scope.ServiceProvider.GetRequiredService<NotificationDispatcher>();
         Assert.True(await dispatcher.DispatchNextAsync(CancellationToken.None));
-        Assert.DoesNotContain(app.Logs.Entries, x => x.Contains("[E-MAIL SIMULADO]"));
+        Assert.DoesNotContain(app.Logs.Entries, x => x.Contains("assunto:"));
         Assert.Equal("Ready", await app.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\""));
         Assert.Equal("ConsoleEmissionFailed", await app.ScalarAsync("SELECT \"LastFailureCode\" FROM \"NotificationIntents\""));
         Assert.False(await dispatcher.DispatchNextAsync(CancellationToken.None));
         await Apply(app, Snapshot(user, 3, FCG.Contracts.IdentityState.Deleted, "latest@example.com"));
         clock.Advance(TimeSpan.FromSeconds(6)); Assert.True(await dispatcher.DispatchNextAsync(CancellationToken.None));
-        var emitted = Assert.Single(app.Logs.Entries, x => x.Contains("[E-MAIL SIMULADO]"));
+        var emitted = Assert.Single(app.Logs.Entries, x => x.Contains("assunto:"));
         Assert.Contains("p***@example.com", emitted); Assert.DoesNotContain("l***@example.com", emitted);
         Assert.DoesNotContain("secret", string.Join('\n', app.Logs.Entries));
         Assert.DoesNotContain("person@example.com", string.Join('\n', app.Logs.Entries));
@@ -132,7 +131,7 @@ public sealed class DispatcherTests(NotificationFixture fixture)
         using (var scope = app.Services.CreateScope())
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => scope.ServiceProvider.GetRequiredService<NotificationDispatcher>().DispatchNextAsync(stop.Token));
         Assert.Equal("Sending", await app.ScalarAsync("SELECT \"State\" FROM \"NotificationIntents\""));
-        Assert.DoesNotContain(app.Logs.Entries, x => x.Contains("[E-MAIL SIMULADO]"));
+        Assert.DoesNotContain(app.Logs.Entries, x => x.Contains("assunto:"));
         clock.Advance(TimeSpan.FromSeconds(31));
         await using var restarted = new NotificationFactory(app.ConnectionString, fixture.BrokerSettings, services => UseClock(services, clock));
         using var restartedClient = restarted.CreateClient(); using var retry = restarted.Services.CreateScope();

@@ -107,11 +107,12 @@ da emissão. A disputa usa lock por IntentId e revalida o estado depois de adqui
 Duas réplicas compartilham apenas o banco Notifications; uma posse válida é
 registrada por vez. Relógios UTC das réplicas devem estar sincronizados.
 
-A saída contém `[E-MAIL SIMULADO]`, tipo, IntentId, AttemptId, UserId e, para compra,
-OrderId/GameId/Price. O destinatário preserva somente a primeira letra local
+A saída no console descreve o e-mail simulado, sem carimbo: `e-mail de boas-vindas enviado para {destinatário}, assunto: {assunto}, {corpo}`
+e o equivalente para confirmação de compra (com pedido, jogo e preço no corpo).
+O destinatário preserva somente a primeira letra local
 (quando houver mais de uma) e o domínio, como `p***@example.com`; entrada inválida
 é totalmente mascarada. Nome e endereço completo não são registrados.
-É uma simulação no console, sem servidor de e-mail ou envio externo. Mantenha
+Não há servidor de e-mail nem envio externo. Mantenha
 a categoria `FCG.Notifications.Delivery.ConsoleNotificationSink` em Information
 e o provedor console habilitado. Se o logger estiver desabilitado, a tentativa
 falha e mantém backoff em vez de registrar Sent sem emissão.

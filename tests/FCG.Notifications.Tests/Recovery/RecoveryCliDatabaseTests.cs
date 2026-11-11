@@ -64,7 +64,7 @@ public sealed class RecoveryCliDatabaseTests(NotificationFixture fixture)
         var shown = await Run(app.ConnectionString, "recover-notifications", "intent", "--id", id.ToString()); Assert.Equal(0, shown.ExitCode);
         var metadata = JsonDocument.Parse(shown.Output).RootElement;
         Assert.Single(metadata.GetProperty("operatorAttempts").EnumerateArray()); Assert.Empty(metadata.GetProperty("deliveryAttempts").EnumerateArray());
-        Assert.DoesNotContain("person@example.com", shown.Output + result.Output); Assert.DoesNotContain("[E-MAIL SIMULADO]", shown.Output + result.Output);
+        Assert.DoesNotContain("person@example.com", shown.Output + result.Output); Assert.DoesNotContain("assunto:", shown.Output + result.Output);
     }
 
     [Fact]
