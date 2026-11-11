@@ -1,0 +1,11 @@
+{
+  "eventId": "33333333-3333-4333-8333-333333333333",
+  "userId": "22222222-2222-4222-8222-222222222222",
+  "eventVersion": 2,
+  "occurredAtUtc": "2026-10-19T12:35:00.000001Z",
+  "name": "Ana Silva",
+  "email": "ana@example.test",
+  "role": "User",
+  "state": "Blocked",
+  "createdAtUtc": "2026-10-19T12:34:56.123456Z"
+}
